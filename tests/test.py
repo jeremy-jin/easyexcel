@@ -1,13 +1,14 @@
 from openpyxl import Workbook
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
-red = InlineFont(color='00FF0000', b=True)
+
+red = InlineFont(color="00FF0000", b=True)
 rich_string1 = CellRichText(
     [
-        'When the color ',
-        TextBlock(red, 'red'),
-        ' is used, you can expect ',
-        TextBlock(red, 'danger')
+        "When the color ",
+        TextBlock(red, "red"),
+        " is used, you can expect ",
+        TextBlock(red, "danger"),
     ]
 )
 

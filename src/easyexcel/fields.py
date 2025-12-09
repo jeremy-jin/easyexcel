@@ -42,8 +42,8 @@ class Field(metaclass=ABCMeta):
         self.required = required
         self.default = default
         self.validators = [*self.default_validators, *validators]
-        self.preprocessors = [*self.default_validators, *preprocessors]
-        self.postprocessors = [*self.default_validators, *postprocessors]
+        self.preprocessors = [*self.default_preprocessors, *preprocessors]
+        self.postprocessors = [*self.default_postprocessors, *postprocessors]
         self.kwargs = kwargs
 
         # Collect default error message from self and parent classes
@@ -184,13 +184,14 @@ class StrField(Field):
 
     def _deserialize(self, value):
         try:
-            value = str(value).strip() if self.strip else str(value)
+            if value is not None:
+                value = str(value).strip() if self.strip else str(value)
 
-            if value is not None and (
-                (self.min_len is not None and len(value) < self.min_len)
-                or (self.max_len is not None and len(value) > self.max_len)
-            ):
-                raise ValueError("Invalid Value.")
+                if value is not None and (
+                    (self.min_len is not None and len(value) < self.min_len)
+                    or (self.max_len is not None and len(value) > self.max_len)
+                ):
+                    raise ValueError("Invalid Value.")
 
         except ValueError:
             self.error(constants.INCORRECT_VALUE, value=self.original_value)
@@ -297,6 +298,9 @@ class EnumField(Field):
         super(EnumField, self).__init__(*args, **kwargs)
 
     def _deserialize(self, value):
+        if value is None:
+            return None
+
         enumeration = {
             element.value.lower(): element.value for element in self.enumeration
         }
@@ -330,7 +334,7 @@ class IntField(Field):
 
     def _deserialize(self, value):
         try:
-            value = int(value)
+            value = int(value) if value is not None else None
         except (ValueError, TypeError):
             self.error(constants.INCORRECT_VALUE, value=self.original_value)
             value = None
@@ -343,7 +347,7 @@ class FloatField(Field):
 
     def _deserialize(self, value):
         try:
-            value = float(value)
+            value = float(value) if value is not None else None
         except ValueError:
             self.error(constants.INCORRECT_VALUE, value=self.original_value)
             value = None
@@ -380,17 +384,20 @@ class DecimalField(Field):
 
     def _deserialize(self, value):
         try:
-            value = Decimal(str(value))
-            self._validate_place(value)
-            if self.places is not None and value.is_finite():
-                value = value.quantize(self.places, rounding=self.rounding)
+            if value is not None:
+                value = Decimal(str(value))
+                self._validate_place(value)
+                if self.places is not None and value.is_finite():
+                    value = value.quantize(self.places, rounding=self.rounding)
 
-            if value is not None and (
-                (self.min_value is not None and value < self.min_value)
-                or (self.max_value is not None and value > self.max_value)
-            ):
-                value = None
-                self.error(constants.INCORRECT_VALUE, value=self.original_value)
+                if (
+                    self.min_value is not None
+                    and value < self.min_value
+                    or self.max_value is not None
+                    and value > self.max_value
+                ):
+                    value = None
+                    self.error(constants.INCORRECT_VALUE, value=self.original_value)
 
         except (ValueError, InvalidOperation):
             self.error(constants.INCORRECT_VALUE, value=self.original_value)
@@ -430,21 +437,6 @@ class StrWithNumberValidator(Validator):
 
     def _run(self, value, *args, **kwargs):
         if value is not None and self.has_number(str(value)):
-            raise ValidationError("Invalid Value.")
-
-
-class PhoneAreaCodeValidator(Validator):
-    area_code_list = constants.AREA_CODE
-    re_compile = re.compile(r"^\+\d+$")
-
-    def _run(self, value, *args, **kwargs):
-        if not self.re_compile.match(value) or str(value) not in self.area_code_list:
-            raise ValidationError("Invalid Value.")
-
-
-class PhoneNumberValidator(Validator):
-    def _run(self, value, *args, **kwargs):
-        if not value.isdigit():
             raise ValidationError("Invalid Value.")
 
 
